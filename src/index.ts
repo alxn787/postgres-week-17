@@ -19,11 +19,15 @@ app.post("/signup", async(req, res)=>{
     
 
     try { 
-        const userResponse = await pgCLient.query(`INSERT INTO users(username,email, password) VALUES ('${username}','${email}','${password}')`);
-        const addressResponse = await pgCLient.query(`INSERT INTO address(city,country,street) VALUES ('${city}','${country}','${street}')`);
+        const userinsertquery = `INSERT INTO users(username,email, password) VALUES ($1,$2,$3) RETURNING id`;
+        const addressinsertquery = `INSERT INTO addresses(user_id,city,country,street) VALUES ($1, $2, $3, $4)`;
+        await pgCLient.query('BEGIN')
+
+        const userResponse = await pgCLient.query(userinsertquery , [username,email,password]);
+        const user_id = userResponse.rows[0].id;
+        const addressResponse = await pgCLient.query(addressinsertquery, [user_id,city,country,street]);
+        await pgCLient.query('COMMIT')
  
-        console.log(userResponse);
-        console.log(addressResponse);
         res.json({
             message:"signed up"
         });
@@ -32,6 +36,23 @@ app.post("/signup", async(req, res)=>{
             message:"error while signing up"
         });
     }    
+})
+
+app.get("/metadata", async(req,res)=>{
+    const id = req.query.id;
+    try{
+        const query = 'SELECT users.id, users.username,users.email,addresses.city,addresses.country,addresses.street FROM users JOIN addresses ON users.id = addresses.user_id WHERE users.id=$1';
+        const response = await pgCLient.query(query,[id]);
+        res.json({
+           response: response.rows
+        })
+    }catch(e){
+        console.log(e);
+        res.json({
+            message:"error occured"
+        });
+    }
+   
 })
 
 app.listen(3000);
